@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Book, Bookmark, Crown, Lyre } from 'lucide-react';
+import { Book, Bookmark, Crown, Music } from 'lucide-react';
 
 const categories = [
   {
@@ -13,7 +13,7 @@ const categories = [
   {
     name: 'Poetry',
     description: 'Verses that capture the beauty and complexity of human experience',
-    icon: Lyre,
+    icon: Music,
     slug: 'poetry'
   },
   {

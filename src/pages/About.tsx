@@ -1,7 +1,6 @@
-
 import React from 'react';
 import Layout from '@/components/Layout';
-import { Lyre } from 'lucide-react';
+import { Music } from 'lucide-react';
 import Newsletter from '@/components/Newsletter';
 
 const About: React.FC = () => {
@@ -43,7 +42,7 @@ const About: React.FC = () => {
           <div className="relative">
             <div className="bg-softgray rounded-lg p-8 relative z-10">
               <div className="bg-gold/20 w-16 h-16 rounded-full flex items-center justify-center mb-6">
-                <Lyre size={32} className="text-deepblue" />
+                <Music size={32} className="text-deepblue" />
               </div>
               <h3 className="text-xl font-playfair font-semibold mb-4">Our Vision</h3>
               <p className="mb-4">
@@ -71,7 +70,6 @@ const About: React.FC = () => {
                 </li>
               </ul>
             </div>
-            {/* Decorative elements */}
             <div className="absolute top-6 right-6 w-full h-full border-2 border-gold/30 rounded-lg -z-10"></div>
             <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-gold/20 rounded-full -z-10"></div>
           </div>
