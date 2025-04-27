@@ -27,7 +27,7 @@ const Hero: React.FC = () => {
             <Button 
               asChild 
               variant="outline" 
-              className="border-white/30 text-gold hover:bg-gold/10 hover:border-gold/50"
+              className="border-white/50 text-white bg-white/10 hover:bg-white/20 hover:border-white/70"
             >
               <Link to="/about">Our Story</Link>
             </Button>
