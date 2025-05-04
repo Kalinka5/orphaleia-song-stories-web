@@ -1,0 +1,111 @@
+import { Book } from "@/types/book"
+import axios from "axios"
+
+// Set up API base URL from environment or use default
+const API_BASE_URL =
+	import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+
+// Create axios instance with base configuration
+const api = axios.create({
+	baseURL: API_BASE_URL,
+	headers: {
+		"Content-Type": "application/json",
+	},
+	withCredentials: true,
+})
+
+// Add request interceptor for authentication
+api.interceptors.request.use(config => {
+	const token = localStorage.getItem("token")
+	if (token) {
+		config.headers.Authorization = `Bearer ${token}`
+	}
+	return config
+})
+
+// Books API
+export const booksApi = {
+	// Get all books with optional filtering
+	getBooks: async (params?: {
+		skip?: number
+		limit?: number
+		category?: string
+		search?: string
+		sort?: string
+		featured?: boolean
+	}) => {
+		const response = await api.get<Book[]>("/books", { params })
+		return response.data
+	},
+
+	// Get a single book by ID
+	getBook: async (id: string) => {
+		const response = await api.get<Book>(`/books/${id}`)
+		return response.data
+	},
+
+	// Get featured books
+	getFeaturedBooks: async (limit: number = 8) => {
+		const response = await api.get<Book[]>("/books/featured", {
+			params: { limit },
+		})
+		return response.data
+	},
+
+	// Get books by category
+	getBooksByCategory: async (
+		category: string,
+		skip: number = 0,
+		limit: number = 100
+	) => {
+		const response = await api.get<Book[]>(`/books/category/${category}`, {
+			params: { skip, limit },
+		})
+		return response.data
+	},
+}
+
+// Auth API
+export const authApi = {
+	login: async (email: string, password: string) => {
+		const response = await api.post("/auth/login", { email, password })
+		return response.data
+	},
+
+	register: async (email: string, password: string, fullName: string) => {
+		const response = await api.post("/auth/register", {
+			email,
+			password,
+			full_name: fullName,
+		})
+		return response.data
+	},
+}
+
+// Orders API
+export const ordersApi = {
+	createOrder: async (orderData: any) => {
+		const response = await api.post("/orders", orderData)
+		return response.data
+	},
+
+	getUserOrders: async () => {
+		const response = await api.get("/orders/user")
+		return response.data
+	},
+}
+
+// Users API
+export const usersApi = {
+	getCurrentUser: async () => {
+		const response = await api.get("/users/me")
+		return response.data
+	},
+
+	updateUser: async (userData: any) => {
+		const response = await api.put("/users/me", userData)
+		return response.data
+	},
+}
+
+export default api
