@@ -1,28 +1,12 @@
 import Layout from "@/components/Layout"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
-import { usersApi } from "@/lib/api"
+import { ordersApi, shippingAddressApi, usersApi } from "@/lib/api"
+import { Order } from "@/types/order"
+import { ShippingAddress } from "@/types/user"
 import { Heart, Key, LogOut, Mail, Package, Settings, User } from "lucide-react"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-
-// Mock order data
-const orderData = [
-	{
-		id: "ORD-1234",
-		date: "2023-09-15",
-		status: "Delivered",
-		total: 53.97,
-		items: 3,
-	},
-	{
-		id: "ORD-5678",
-		date: "2023-10-28",
-		status: "Processing",
-		total: 29.99,
-		items: 1,
-	},
-]
 
 const Account: React.FC = () => {
 	const [activeTab, setActiveTab] = useState("profile")
@@ -40,6 +24,28 @@ const Account: React.FC = () => {
 		email: "",
 		password: "",
 	})
+	const [orders, setOrders] = useState<Order[]>([])
+
+	// Form states
+	const [isEditingProfile, setIsEditingProfile] = useState(false)
+	const [profileForm, setProfileForm] = useState({
+		full_name: "",
+		email: "",
+	})
+
+	const [isEditingAddress, setIsEditingAddress] = useState(false)
+	const [addressForm, setAddressForm] = useState<ShippingAddress>({
+		id: "",
+		user_id: "",
+		street_address: "",
+		city: "",
+		state: "",
+		postal_code: "",
+		country: "",
+	})
+
+	const [userShippingAddress, setUserShippingAddress] =
+		useState<ShippingAddress | null>(null)
 
 	useEffect(() => {
 		const fetchUserData = async () => {
@@ -47,7 +53,22 @@ const Account: React.FC = () => {
 				setIsLoading(true)
 				const data = await usersApi.getCurrentUser()
 				setUserData(data)
+				setProfileForm({
+					full_name: data.full_name,
+					email: data.email,
+				})
+
+				// If the user has a shipping address, fetch it
+				if (data.shipping_address) {
+					setUserShippingAddress(data.shipping_address)
+					setAddressForm(data.shipping_address)
+				}
+
 				setIsLoggedIn(true)
+
+				// Fetch user orders
+				const userOrders = await ordersApi.getUserOrders()
+				setOrders(userOrders)
 			} catch (error) {
 				console.error("Error fetching user data:", error)
 				setIsLoggedIn(false)
@@ -89,6 +110,156 @@ const Account: React.FC = () => {
 			title: "Logged out",
 			description: "You have been logged out successfully.",
 		})
+	}
+
+	const handleProfileFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setProfileForm({
+			...profileForm,
+			[e.target.name]: e.target.value,
+		})
+	}
+
+	const handleAddressFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setAddressForm({
+			...addressForm,
+			[e.target.name]: e.target.value,
+		})
+	}
+
+	const handleProfileSubmit = async (e: React.FormEvent) => {
+		e.preventDefault()
+		try {
+			setIsLoading(true)
+
+			// Update the user profile
+			const updatedUser = await usersApi.updateUser({
+				full_name: profileForm.full_name,
+				email: profileForm.email,
+			})
+
+			setUserData(updatedUser)
+			setIsEditingProfile(false)
+
+			toast({
+				title: "Profile updated",
+				description: "Your profile information has been updated successfully.",
+			})
+		} catch (error) {
+			console.error("Error updating profile:", error)
+			toast({
+				title: "Update failed",
+				description:
+					"There was an error updating your profile. Please try again.",
+				variant: "destructive",
+			})
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	const handleAddressSubmit = async (e: React.FormEvent) => {
+		e.preventDefault()
+		try {
+			setIsLoading(true)
+
+			let updatedAddress
+
+			// If user already has an address, update it. Otherwise, create a new one.
+			if (userShippingAddress) {
+				updatedAddress = await shippingAddressApi.updateShippingAddress(
+					addressForm
+				)
+			} else {
+				updatedAddress = await shippingAddressApi.createShippingAddress(
+					addressForm as Required<ShippingAddress>
+				)
+			}
+
+			setUserShippingAddress(updatedAddress)
+			setIsEditingAddress(false)
+
+			// Refresh user data to include updated shipping address
+			const updatedUser = await usersApi.getCurrentUser()
+			setUserData(updatedUser)
+
+			toast({
+				title: "Address updated",
+				description: "Your shipping address has been updated successfully.",
+			})
+		} catch (error) {
+			console.error("Error updating address:", error)
+			toast({
+				title: "Update failed",
+				description:
+					"There was an error updating your shipping address. Please try again.",
+				variant: "destructive",
+			})
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	const handleDeleteAddress = async () => {
+		if (
+			!window.confirm("Are you sure you want to delete your shipping address?")
+		) {
+			return
+		}
+
+		try {
+			setIsLoading(true)
+			await shippingAddressApi.deleteShippingAddress()
+			setUserShippingAddress(null)
+			setAddressForm({
+				id: "",
+				user_id: "",
+				street_address: "",
+				city: "",
+				state: "",
+				postal_code: "",
+				country: "",
+			})
+
+			// Refresh user data to remove shipping address
+			const updatedUser = await usersApi.getCurrentUser()
+			setUserData(updatedUser)
+
+			toast({
+				title: "Address deleted",
+				description: "Your shipping address has been deleted successfully.",
+			})
+		} catch (error) {
+			console.error("Error deleting address:", error)
+			toast({
+				title: "Delete failed",
+				description:
+					"There was an error deleting your shipping address. Please try again.",
+				variant: "destructive",
+			})
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	// Format the status for display
+	const formatStatus = (status: string) => {
+		return status.charAt(0).toUpperCase() + status.slice(1)
+	}
+
+	// Get appropriate status style
+	const getStatusStyle = (status: string) => {
+		switch (status) {
+			case "delivered":
+				return "bg-green-100 text-green-800"
+			case "shipped":
+				return "bg-blue-100 text-blue-800"
+			case "processing":
+				return "bg-yellow-100 text-yellow-800"
+			case "cancelled":
+				return "bg-red-100 text-red-800"
+			default:
+				return "bg-gray-100 text-gray-800"
+		}
 	}
 
 	if (isLoading) {
@@ -290,83 +461,304 @@ const Account: React.FC = () => {
 									Profile Information
 								</h2>
 
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-									<div>
-										<label htmlFor="name" className="block mb-2 font-medium">
-											Full Name
-										</label>
-										<input
-											type="text"
-											id="name"
-											value={userData.full_name}
-											className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
-											readOnly
-										/>
-									</div>
+								{isEditingProfile ? (
+									<form onSubmit={handleProfileSubmit}>
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+											<div>
+												<label
+													htmlFor="full_name"
+													className="block mb-2 font-medium"
+												>
+													Full Name
+												</label>
+												<input
+													type="text"
+													id="full_name"
+													name="full_name"
+													value={profileForm.full_name}
+													onChange={handleProfileFormChange}
+													className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+													required
+												/>
+											</div>
 
-									<div>
-										<label htmlFor="email" className="block mb-2 font-medium">
-											Email
-										</label>
-										<input
-											type="email"
-											id="email"
-											value={userData.email}
-											className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
-											readOnly
-										/>
-									</div>
-
-									<div>
-										<label
-											htmlFor="join-date"
-											className="block mb-2 font-medium"
-										>
-											Member Since
-										</label>
-										<input
-											type="text"
-											id="join-date"
-											value={
-												userData.created_at
-													? new Date(userData.created_at).toLocaleDateString(
-															"en-US",
-															{ year: "numeric", month: "long", day: "numeric" }
-													  )
-													: ""
-											}
-											className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
-											readOnly
-										/>
-									</div>
-
-									{userData.is_admin && (
+											<div>
+												<label
+													htmlFor="email"
+													className="block mb-2 font-medium"
+												>
+													Email
+												</label>
+												<input
+													type="email"
+													id="email"
+													name="email"
+													value={profileForm.email}
+													onChange={handleProfileFormChange}
+													className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+													required
+												/>
+											</div>
+										</div>
+										<div className="mt-6 flex space-x-4">
+											<Button type="submit" disabled={isLoading}>
+												Save Changes
+											</Button>
+											<Button
+												type="button"
+												variant="outline"
+												onClick={() => {
+													setIsEditingProfile(false)
+													setProfileForm({
+														full_name: userData.full_name,
+														email: userData.email,
+													})
+												}}
+											>
+												Cancel
+											</Button>
+										</div>
+									</form>
+								) : (
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 										<div>
-											<label htmlFor="role" className="block mb-2 font-medium">
-												Role
+											<label htmlFor="name" className="block mb-2 font-medium">
+												Full Name
 											</label>
 											<input
 												type="text"
-												id="role"
-												value="Administrator"
-												className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold bg-gold/10"
+												id="name"
+												value={userData.full_name}
+												className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
 												readOnly
 											/>
 										</div>
-									)}
-								</div>
+
+										<div>
+											<label htmlFor="email" className="block mb-2 font-medium">
+												Email
+											</label>
+											<input
+												type="email"
+												id="email"
+												value={userData.email}
+												className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+												readOnly
+											/>
+										</div>
+
+										<div>
+											<label
+												htmlFor="join-date"
+												className="block mb-2 font-medium"
+											>
+												Member Since
+											</label>
+											<input
+												type="text"
+												id="join-date"
+												value={
+													userData.created_at
+														? new Date(userData.created_at).toLocaleDateString(
+																"en-US",
+																{
+																	year: "numeric",
+																	month: "long",
+																	day: "numeric",
+																}
+														  )
+														: ""
+												}
+												className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+												readOnly
+											/>
+										</div>
+
+										{userData.is_admin && (
+											<div>
+												<label
+													htmlFor="role"
+													className="block mb-2 font-medium"
+												>
+													Role
+												</label>
+												<input
+													type="text"
+													id="role"
+													value="Administrator"
+													className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold bg-gold/10"
+													readOnly
+												/>
+											</div>
+										)}
+
+										<div className="md:col-span-2 mt-4">
+											<Button onClick={() => setIsEditingProfile(true)}>
+												Edit Profile
+											</Button>
+										</div>
+									</div>
+								)}
 
 								<div className="mt-8">
 									<h3 className="text-xl font-playfair font-semibold mb-4">
 										Shipping Address
 									</h3>
-									<div className="p-4 border border-border rounded-md bg-muted/30">
-										<p className="text-muted-foreground italic">
-											No shipping address on file.
-										</p>
-									</div>
+									{isEditingAddress ? (
+										<form onSubmit={handleAddressSubmit} className="space-y-4">
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+												<div className="md:col-span-2">
+													<label
+														htmlFor="street_address"
+														className="block mb-2 font-medium"
+													>
+														Street Address
+													</label>
+													<input
+														type="text"
+														id="street_address"
+														name="street_address"
+														value={addressForm.street_address}
+														onChange={handleAddressFormChange}
+														className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+														required
+													/>
+												</div>
 
-									<Button className="mt-4">Add Shipping Address</Button>
+												<div>
+													<label
+														htmlFor="city"
+														className="block mb-2 font-medium"
+													>
+														City
+													</label>
+													<input
+														type="text"
+														id="city"
+														name="city"
+														value={addressForm.city}
+														onChange={handleAddressFormChange}
+														className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+														required
+													/>
+												</div>
+
+												<div>
+													<label
+														htmlFor="state"
+														className="block mb-2 font-medium"
+													>
+														State/Province
+													</label>
+													<input
+														type="text"
+														id="state"
+														name="state"
+														value={addressForm.state}
+														onChange={handleAddressFormChange}
+														className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+														required
+													/>
+												</div>
+
+												<div>
+													<label
+														htmlFor="postal_code"
+														className="block mb-2 font-medium"
+													>
+														Postal Code
+													</label>
+													<input
+														type="text"
+														id="postal_code"
+														name="postal_code"
+														value={addressForm.postal_code}
+														onChange={handleAddressFormChange}
+														className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+														required
+													/>
+												</div>
+
+												<div>
+													<label
+														htmlFor="country"
+														className="block mb-2 font-medium"
+													>
+														Country
+													</label>
+													<input
+														type="text"
+														id="country"
+														name="country"
+														value={addressForm.country}
+														onChange={handleAddressFormChange}
+														className="w-full px-4 py-3 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-gold"
+														required
+													/>
+												</div>
+											</div>
+
+											<div className="flex space-x-4 mt-6">
+												<Button type="submit" disabled={isLoading}>
+													Save Address
+												</Button>
+												<Button
+													type="button"
+													variant="outline"
+													onClick={() => {
+														setIsEditingAddress(false)
+														if (userShippingAddress) {
+															setAddressForm(userShippingAddress)
+														}
+													}}
+												>
+													Cancel
+												</Button>
+											</div>
+										</form>
+									) : (
+										<div>
+											{userShippingAddress ? (
+												<div className="p-4 border border-border rounded-md">
+													<p className="mb-1">
+														{userShippingAddress.street_address}
+													</p>
+													<p className="mb-1">
+														{userShippingAddress.city},{" "}
+														{userShippingAddress.state}{" "}
+														{userShippingAddress.postal_code}
+													</p>
+													<p>{userShippingAddress.country}</p>
+
+													<div className="mt-4 flex space-x-4">
+														<Button onClick={() => setIsEditingAddress(true)}>
+															Edit Address
+														</Button>
+														<Button
+															variant="outline"
+															onClick={handleDeleteAddress}
+														>
+															Delete
+														</Button>
+													</div>
+												</div>
+											) : (
+												<div>
+													<div className="p-4 border border-border rounded-md bg-muted/30">
+														<p className="text-muted-foreground italic">
+															No shipping address on file.
+														</p>
+													</div>
+													<Button
+														className="mt-4"
+														onClick={() => setIsEditingAddress(true)}
+													>
+														Add Shipping Address
+													</Button>
+												</div>
+											)}
+										</div>
+									)}
 								</div>
 
 								<div className="mt-8">
@@ -384,7 +776,7 @@ const Account: React.FC = () => {
 									Order History
 								</h2>
 
-								{orderData.length > 0 ? (
+								{orders.length > 0 ? (
 									<div className="overflow-x-auto">
 										<table className="w-full">
 											<thead>
@@ -398,25 +790,25 @@ const Account: React.FC = () => {
 												</tr>
 											</thead>
 											<tbody>
-												{orderData.map(order => (
+												{orders.map(order => (
 													<tr key={order.id} className="border-b border-border">
-														<td className="py-4">{order.id}</td>
+														<td className="py-4">{order.id.slice(0, 8)}</td>
 														<td className="py-4">
-															{new Date(order.date).toLocaleDateString()}
+															{new Date(order.created_at).toLocaleDateString()}
 														</td>
 														<td className="py-4">
 															<span
-																className={`px-2 py-1 rounded-full text-xs ${
-																	order.status === "Delivered"
-																		? "bg-green-100 text-green-800"
-																		: "bg-blue-100 text-blue-800"
-																}`}
+																className={`px-2 py-1 rounded-full text-xs ${getStatusStyle(
+																	order.status
+																)}`}
 															>
-																{order.status}
+																{formatStatus(order.status)}
 															</span>
 														</td>
-														<td className="py-4">${order.total.toFixed(2)}</td>
-														<td className="py-4">{order.items}</td>
+														<td className="py-4">
+															${order.total_amount.toFixed(2)}
+														</td>
+														<td className="py-4">{order.item_count}</td>
 														<td className="py-4">
 															<button className="text-deepblue hover:underline text-sm">
 																Details
@@ -506,7 +898,14 @@ const Account: React.FC = () => {
 										<h3 className="text-lg font-medium mb-4">
 											Account Management
 										</h3>
-										<Button variant="outline" className="mr-4">
+										<Button
+											variant="outline"
+											className="mr-4"
+											onClick={() => {
+												setActiveTab("profile")
+												setIsEditingProfile(true)
+											}}
+										>
 											Update Profile
 										</Button>
 										<Button variant="destructive">Delete Account</Button>

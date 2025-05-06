@@ -108,4 +108,39 @@ export const usersApi = {
 	},
 }
 
+// Shipping Address API
+export const shippingAddressApi = {
+	getShippingAddress: async () => {
+		const response = await api.get("/shipping-addresses/me")
+		return response.data
+	},
+
+	createShippingAddress: async (addressData: {
+		street_address: string
+		city: string
+		state: string
+		postal_code: string
+		country: string
+	}) => {
+		const response = await api.post("/shipping-addresses/me", addressData)
+		return response.data
+	},
+
+	updateShippingAddress: async (addressData: {
+		street_address?: string
+		city?: string
+		state?: string
+		postal_code?: string
+		country?: string
+	}) => {
+		const response = await api.put("/shipping-addresses/me", addressData)
+		return response.data
+	},
+
+	deleteShippingAddress: async () => {
+		const response = await api.delete("/shipping-addresses/me")
+		return response.data
+	},
+}
+
 export default api
