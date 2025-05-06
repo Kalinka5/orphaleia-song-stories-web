@@ -2,10 +2,17 @@ import BookCard from "@/components/BookCard"
 import Layout from "@/components/Layout"
 import WishlistButton from "@/components/WishlistButton"
 import { Button } from "@/components/ui/button"
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { booksApi } from "@/lib/api"
 import { Book } from "@/types/book"
-import { Bookmark, Share, ShoppingCart } from "lucide-react"
+import { Play, Share, ShoppingCart } from "lucide-react"
 import React, { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 
@@ -16,6 +23,7 @@ const BookDetail: React.FC = () => {
 	const { toast } = useToast()
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+	const [showPreview, setShowPreview] = useState(false)
 
 	useEffect(() => {
 		const fetchBookDetail = async () => {
@@ -157,24 +165,36 @@ const BookDetail: React.FC = () => {
 									<ShoppingCart size={18} />
 									Add to Cart
 								</Button>
-								<Button
-									variant="outline"
-									className="flex items-center gap-2"
-									asChild
-								>
-									<span
-										onClick={() =>
-											document
-												.querySelector<HTMLButtonElement>(
-													`.wishlist-btn-${book.id}`
-												)
-												?.click()
-										}
-									>
-										<Bookmark size={18} />
-										Save for Later
-									</span>
-								</Button>
+								<Dialog open={showPreview} onOpenChange={setShowPreview}>
+									<DialogTrigger asChild>
+										<Button
+											variant="outline"
+											className="flex items-center gap-2"
+										>
+											<Play size={18} />
+											Preview
+										</Button>
+									</DialogTrigger>
+									<DialogContent className="sm:max-w-[700px]">
+										<DialogHeader>
+											<DialogTitle>{book.title} - Book Preview</DialogTitle>
+										</DialogHeader>
+										<div className="mt-4">
+											<video
+												controls
+												width="100%"
+												className="rounded-md"
+												autoPlay
+											>
+												<source
+													src="https://kalinanews-bucket.s3.eu-north-1.amazonaws.com/invideo-ai-1080+The+Iliad_+Epic+Tale+of+War+and+Heroism+2025-05-06.mp4"
+													type="video/mp4"
+												/>
+												Your browser does not support the video tag.
+											</video>
+										</div>
+									</DialogContent>
+								</Dialog>
 								<div className="hidden">
 									<WishlistButton
 										bookId={book.id}
