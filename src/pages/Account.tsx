@@ -1,15 +1,25 @@
 import Layout from "@/components/Layout"
 import { Button } from "@/components/ui/button"
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { ordersApi, shippingAddressApi, usersApi } from "@/lib/api"
-import { Order } from "@/types/order"
+import { booksApi, ordersApi, shippingAddressApi, usersApi } from "@/lib/api"
+import { Book } from "@/types/book"
+import { Order, OrderItem } from "@/types/order"
 import { ShippingAddress } from "@/types/user"
 import { Heart, Key, LogOut, Mail, Package, Settings, User } from "lucide-react"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 
+type AccountTab = "profile" | "orders" | "wishlist" | "settings"
+
 const Account: React.FC = () => {
-	const [activeTab, setActiveTab] = useState("profile")
+	const [activeTab, setActiveTab] = useState<AccountTab>("profile")
 	const { toast } = useToast()
 	const [isLoggedIn, setIsLoggedIn] = useState(true)
 	const [isLoading, setIsLoading] = useState(false)
@@ -25,6 +35,10 @@ const Account: React.FC = () => {
 		password: "",
 	})
 	const [orders, setOrders] = useState<Order[]>([])
+	const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+	const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false)
+	const [orderBooks, setOrderBooks] = useState<{ [key: string]: Book }>({})
+	const [loadingOrderDetails, setLoadingOrderDetails] = useState(false)
 
 	// Form states
 	const [isEditingProfile, setIsEditingProfile] = useState(false)
@@ -259,6 +273,39 @@ const Account: React.FC = () => {
 				return "bg-red-100 text-red-800"
 			default:
 				return "bg-gray-100 text-gray-800"
+		}
+	}
+
+	const fetchOrderDetails = async (order: Order) => {
+		if (!order.items || order.items.length === 0) return
+
+		try {
+			setLoadingOrderDetails(true)
+			const bookDetailsMap: { [key: string]: Book } = {}
+
+			// Create an array of promises to fetch all books in parallel
+			const bookPromises = order.items.map(async item => {
+				try {
+					const bookData = await booksApi.getBook(item.book_id)
+					bookDetailsMap[item.book_id] = bookData
+				} catch (error) {
+					console.error(`Error fetching book ${item.book_id}:`, error)
+				}
+			})
+
+			// Wait for all book fetches to complete
+			await Promise.all(bookPromises)
+
+			setOrderBooks(bookDetailsMap)
+		} catch (error) {
+			console.error("Error fetching order details:", error)
+			toast({
+				title: "Error loading details",
+				description: "Could not load complete order details.",
+				variant: "destructive",
+			})
+		} finally {
+			setLoadingOrderDetails(false)
 		}
 	}
 
@@ -810,7 +857,14 @@ const Account: React.FC = () => {
 														</td>
 														<td className="py-4">{order.item_count}</td>
 														<td className="py-4">
-															<button className="text-deepblue hover:underline text-sm">
+															<button
+																className="text-deepblue hover:underline text-sm"
+																onClick={() => {
+																	setSelectedOrder(order)
+																	setIsOrderDetailsOpen(true)
+																	fetchOrderDetails(order)
+																}}
+															>
 																Details
 															</button>
 														</td>
@@ -829,6 +883,164 @@ const Account: React.FC = () => {
 										</Button>
 									</div>
 								)}
+
+								{/* Order Details Modal */}
+								<Dialog
+									open={isOrderDetailsOpen}
+									onOpenChange={setIsOrderDetailsOpen}
+								>
+									<DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+										<DialogHeader>
+											<DialogTitle className="text-2xl font-playfair">
+												Order Details
+											</DialogTitle>
+										</DialogHeader>
+
+										{selectedOrder && (
+											<div className="mt-4">
+												<div className="grid grid-cols-2 gap-4 mb-6">
+													<div>
+														<h3 className="font-medium text-sm text-muted-foreground">
+															Order ID
+														</h3>
+														<p>{selectedOrder.id}</p>
+													</div>
+													<div>
+														<h3 className="font-medium text-sm text-muted-foreground">
+															Date
+														</h3>
+														<p>
+															{new Date(
+																selectedOrder.created_at
+															).toLocaleDateString()}
+														</p>
+													</div>
+													<div>
+														<h3 className="font-medium text-sm text-muted-foreground">
+															Status
+														</h3>
+														<span
+															className={`px-2 py-1 rounded-full text-xs ${getStatusStyle(
+																selectedOrder.status
+															)}`}
+														>
+															{formatStatus(selectedOrder.status)}
+														</span>
+													</div>
+													<div>
+														<h3 className="font-medium text-sm text-muted-foreground">
+															Total Amount
+														</h3>
+														<p>${selectedOrder.total_amount.toFixed(2)}</p>
+													</div>
+												</div>
+
+												<div className="mb-6">
+													<h3 className="font-medium mb-2">Shipping Address</h3>
+													<p className="text-sm">
+														{selectedOrder.shipping_address}
+													</p>
+												</div>
+
+												<h3 className="font-medium mb-3">Order Items</h3>
+												{loadingOrderDetails ? (
+													<div className="py-8 text-center">
+														<p className="text-muted-foreground">
+															Loading order details...
+														</p>
+													</div>
+												) : selectedOrder.items &&
+												  selectedOrder.items.length > 0 ? (
+													<div className="border rounded-md overflow-hidden">
+														<table className="w-full">
+															<thead className="bg-muted/40">
+																<tr>
+																	<th className="text-left p-3">Book</th>
+																	<th className="text-left p-3">Quantity</th>
+																	<th className="text-left p-3">Price</th>
+																	<th className="text-left p-3">Subtotal</th>
+																</tr>
+															</thead>
+															<tbody>
+																{selectedOrder.items.map((item: OrderItem) => (
+																	<tr
+																		key={item.id}
+																		className="border-t border-border"
+																	>
+																		<td className="p-3">
+																			<div className="flex items-center gap-3">
+																				{orderBooks[item.book_id] && (
+																					<img
+																						src={orderBooks[item.book_id].cover}
+																						alt={orderBooks[item.book_id].title}
+																						className="w-10 h-14 object-cover rounded"
+																					/>
+																				)}
+																				<div>
+																					<p className="font-medium">
+																						{orderBooks[item.book_id]
+																							? orderBooks[item.book_id].title
+																							: `Book ID: ${item.book_id}`}
+																					</p>
+																					{orderBooks[item.book_id] && (
+																						<p className="text-xs text-muted-foreground">
+																							{orderBooks[item.book_id].author}
+																						</p>
+																					)}
+																				</div>
+																			</div>
+																		</td>
+																		<td className="p-3">{item.quantity}</td>
+																		<td className="p-3">
+																			${item.unit_price.toFixed(2)}
+																		</td>
+																		<td className="p-3">
+																			$
+																			{(
+																				item.quantity * item.unit_price
+																			).toFixed(2)}
+																		</td>
+																	</tr>
+																))}
+															</tbody>
+														</table>
+													</div>
+												) : (
+													<p className="text-sm text-muted-foreground">
+														No item details available.
+													</p>
+												)}
+
+												<div className="mt-6 flex justify-end">
+													<div className="text-right">
+														<div className="flex justify-between gap-8">
+															<span>Subtotal:</span>
+															<span className="font-medium">
+																${selectedOrder.total_amount.toFixed(2)}
+															</span>
+														</div>
+														<div className="flex justify-between gap-8 text-muted-foreground">
+															<span>Shipping:</span>
+															<span>$0.00</span>
+														</div>
+														<div className="flex justify-between gap-8 text-lg font-medium mt-2">
+															<span>Total:</span>
+															<span>
+																${selectedOrder.total_amount.toFixed(2)}
+															</span>
+														</div>
+													</div>
+												</div>
+
+												<div className="mt-6 flex justify-end">
+													<DialogClose asChild>
+														<Button variant="outline">Close</Button>
+													</DialogClose>
+												</div>
+											</div>
+										)}
+									</DialogContent>
+								</Dialog>
 							</div>
 						)}
 
