@@ -1,4 +1,5 @@
 import { Book } from "@/types/book"
+import { WishlistItem } from "@/types/wishlist"
 import axios from "axios"
 
 // Set up API base URL from environment or use default
@@ -140,6 +141,41 @@ export const shippingAddressApi = {
 	deleteShippingAddress: async () => {
 		const response = await api.delete("/shipping-addresses/me")
 		return response.data
+	},
+}
+
+// Wishlist API
+export const wishlistApi = {
+	// Get all wishlist items for current user
+	getWishlist: async () => {
+		const response = await api.get<WishlistItem[]>("/wishlist")
+		return response.data
+	},
+
+	// Add a book to wishlist
+	addToWishlist: async (bookId: string) => {
+		const response = await api.post<WishlistItem>("/wishlist", {
+			book_id: bookId,
+		})
+		return response.data
+	},
+
+	// Remove a book from wishlist
+	removeFromWishlist: async (bookId: string) => {
+		const response = await api.delete(`/wishlist/${bookId}`)
+		return response.data
+	},
+
+	// Check if a book is in the wishlist
+	isInWishlist: async (bookId: string) => {
+		try {
+			const response = await api.get<{ exists: boolean }>(
+				`/wishlist/check/${bookId}`
+			)
+			return response.data.exists
+		} catch (error) {
+			return false
+		}
 	},
 }
 

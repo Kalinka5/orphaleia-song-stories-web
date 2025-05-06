@@ -8,11 +8,27 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { booksApi, ordersApi, shippingAddressApi, usersApi } from "@/lib/api"
+import {
+	booksApi,
+	ordersApi,
+	shippingAddressApi,
+	usersApi,
+	wishlistApi,
+} from "@/lib/api"
 import { Book } from "@/types/book"
 import { Order, OrderItem } from "@/types/order"
 import { ShippingAddress } from "@/types/user"
-import { Heart, Key, LogOut, Mail, Package, Settings, User } from "lucide-react"
+import { WishlistItem } from "@/types/wishlist"
+import {
+	Heart,
+	Key,
+	LogOut,
+	Mail,
+	Package,
+	Settings,
+	Trash,
+	User,
+} from "lucide-react"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 
@@ -61,6 +77,9 @@ const Account: React.FC = () => {
 	const [userShippingAddress, setUserShippingAddress] =
 		useState<ShippingAddress | null>(null)
 
+	const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
+	const [isWishlistLoading, setIsWishlistLoading] = useState(false)
+
 	useEffect(() => {
 		const fetchUserData = async () => {
 			try {
@@ -98,6 +117,51 @@ const Account: React.FC = () => {
 
 		fetchUserData()
 	}, [toast])
+
+	// Fetch wishlist items when the active tab changes to wishlist
+	useEffect(() => {
+		if (activeTab === "wishlist" && isLoggedIn) {
+			fetchWishlistItems()
+		}
+	}, [activeTab, isLoggedIn])
+
+	const fetchWishlistItems = async () => {
+		try {
+			setIsWishlistLoading(true)
+			const items = await wishlistApi.getWishlist()
+			setWishlistItems(items)
+		} catch (error) {
+			console.error("Error fetching wishlist:", error)
+			toast({
+				title: "Error",
+				description: "Could not load your wishlist. Please try again.",
+				variant: "destructive",
+			})
+		} finally {
+			setIsWishlistLoading(false)
+		}
+	}
+
+	const handleRemoveFromWishlist = async (bookId: string) => {
+		try {
+			await wishlistApi.removeFromWishlist(bookId)
+			// Update the local state to remove the item
+			setWishlistItems(prevItems =>
+				prevItems.filter(item => item.book_id !== bookId)
+			)
+			toast({
+				title: "Success",
+				description: "Item removed from wishlist",
+			})
+		} catch (error) {
+			console.error("Error removing from wishlist:", error)
+			toast({
+				title: "Error",
+				description: "Could not remove the item from your wishlist.",
+				variant: "destructive",
+			})
+		}
+	}
 
 	const handleLoginFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setLoginForm({
@@ -1049,14 +1113,72 @@ const Account: React.FC = () => {
 								<h2 className="text-2xl font-playfair font-semibold mb-6">
 									My Wishlist
 								</h2>
-								<div className="text-center py-8">
-									<p className="text-muted-foreground mb-4">
-										Your wishlist is empty.
-									</p>
-									<Button asChild>
-										<Link to="/books">Discover Books</Link>
-									</Button>
-								</div>
+
+								{isWishlistLoading ? (
+									<div className="text-center py-8">
+										<p>Loading your wishlist...</p>
+									</div>
+								) : wishlistItems.length > 0 ? (
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+										{wishlistItems.map(item => (
+											<div
+												key={item.id}
+												className="flex border border-border rounded-md overflow-hidden"
+											>
+												{item.book && (
+													<>
+														<div className="w-24 h-32">
+															<img
+																src={item.book.cover}
+																alt={item.book.title}
+																className="w-full h-full object-cover"
+															/>
+														</div>
+														<div className="p-4 flex-grow flex flex-col justify-between">
+															<div>
+																<h3 className="font-medium">
+																	{item.book.title}
+																</h3>
+																<p className="text-sm text-muted-foreground">
+																	{item.book.author}
+																</p>
+																<p className="text-sm mt-1">
+																	${item.book.price.toFixed(2)}
+																</p>
+															</div>
+															<div className="flex justify-between items-center mt-2">
+																<Button variant="outline" size="sm" asChild>
+																	<Link to={`/books/${item.book_id}`}>
+																		View Details
+																	</Link>
+																</Button>
+																<Button
+																	variant="ghost"
+																	size="icon"
+																	onClick={() =>
+																		handleRemoveFromWishlist(item.book_id)
+																	}
+																	className="text-muted-foreground hover:text-red-500"
+																>
+																	<Trash size={18} />
+																</Button>
+															</div>
+														</div>
+													</>
+												)}
+											</div>
+										))}
+									</div>
+								) : (
+									<div className="text-center py-8">
+										<p className="text-muted-foreground mb-4">
+											Your wishlist is empty.
+										</p>
+										<Button asChild>
+											<Link to="/books">Discover Books</Link>
+										</Button>
+									</div>
+								)}
 							</div>
 						)}
 

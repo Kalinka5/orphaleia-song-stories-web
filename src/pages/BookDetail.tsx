@@ -1,10 +1,11 @@
 import BookCard from "@/components/BookCard"
 import Layout from "@/components/Layout"
+import WishlistButton from "@/components/WishlistButton"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { booksApi } from "@/lib/api"
 import { Book } from "@/types/book"
-import { Bookmark, Heart, Share, ShoppingCart } from "lucide-react"
+import { Bookmark, Share, ShoppingCart } from "lucide-react"
 import React, { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 
@@ -54,13 +55,6 @@ const BookDetail: React.FC = () => {
 		toast({
 			title: "Added to cart",
 			description: `${book?.title} has been added to your cart.`,
-		})
-	}
-
-	const addToWishlist = () => {
-		toast({
-			title: "Added to wishlist",
-			description: `${book?.title} has been added to your wishlist.`,
 		})
 	}
 
@@ -133,10 +127,11 @@ const BookDetail: React.FC = () => {
 								className="w-full h-auto rounded-lg shadow-lg"
 							/>
 							<div className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-md">
-								<Heart
-									size={20}
-									className="text-muted-foreground hover:text-red-500 cursor-pointer"
-									onClick={addToWishlist}
+								<WishlistButton
+									bookId={book.id}
+									variant="ghost"
+									size="icon"
+									className="text-muted-foreground hover:text-red-500"
 								/>
 							</div>
 						</div>
@@ -165,11 +160,27 @@ const BookDetail: React.FC = () => {
 								<Button
 									variant="outline"
 									className="flex items-center gap-2"
-									onClick={addToWishlist}
+									asChild
 								>
-									<Bookmark size={18} />
-									Save for Later
+									<span
+										onClick={() =>
+											document
+												.querySelector<HTMLButtonElement>(
+													`.wishlist-btn-${book.id}`
+												)
+												?.click()
+										}
+									>
+										<Bookmark size={18} />
+										Save for Later
+									</span>
 								</Button>
+								<div className="hidden">
+									<WishlistButton
+										bookId={book.id}
+										className={`wishlist-btn-${book.id}`}
+									/>
+								</div>
 							</div>
 						</div>
 
