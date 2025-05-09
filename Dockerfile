@@ -16,12 +16,12 @@ COPY . .
 # Build step - uncomment if you want to build for production
 # RUN npm run build
 
-# Expose the default Vite development server port
-EXPOSE 5173
+# Expose the port the app runs on
+EXPOSE 8080
 
 # Use an explicit network interface binding
 ENV HOST=0.0.0.0
-ENV VITE_PORT=5173
+ENV VITE_PORT=8080
 
 # Start the development server with specific host binding
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"] 
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"] 
