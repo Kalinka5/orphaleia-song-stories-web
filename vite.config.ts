@@ -12,8 +12,7 @@ export default defineConfig({
 			"localhost",
 			"orphaleia.com",
 			"www.orphaleia.com",
-			// Add your EC2 IP address if needed
-			// 'your-ec2-ip'
+			"16.16.187.205",
 		],
 		cors: true,
 		hmr: {
